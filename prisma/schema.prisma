@@ -1,13 +1,670 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// FitBook - Fitness Studio Booking & Management Platform
+// Prisma Schema
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  admin
+  instructor
+  front_desk
+  member
+}
+
+enum SessionStatus {
+  scheduled
+  cancelled
+  completed
+}
+
+enum BookingStatus {
+  booked
+  waitlisted
+  cancelled
+  late_cancelled
+  no_show
+  checked_in
+}
+
+enum BookingSource {
+  web
+  app
+  front_desk
+  walk_in
+}
+
+enum MembershipType {
+  unlimited
+  pack
+  drop_in
+  intro
+  trial
+}
+
+enum BillingCycle {
+  monthly
+  weekly
+  annual
+  once
+}
+
+enum MembershipStatus {
+  active
+  paused
+  cancelled
+  expired
+}
+
+enum PaymentType {
+  membership
+  pack
+  drop_in
+  manual
+  refund
+}
+
+enum PaymentStatus {
+  paid
+  pending
+  failed
+  refunded
+}
+
+enum CreditReason {
+  purchase
+  booking
+  cancellation
+  refund
+  admin_adjustment
+}
+
+enum WaitlistMode {
+  auto_add
+  first_to_claim
+}
+
+enum CheckInMethod {
+  manual
+  qr_code
+  kiosk
+}
+
+enum PayRateType {
+  flat_per_class
+  hourly
+  percentage
+}
+
+enum NotificationChannel {
+  email
+  sms
+}
+
+enum NotificationStatus {
+  sent
+  failed
+  bounced
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STUDIO
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Studio {
+  id        String   @id @default(cuid())
+  name      String
+  timezone  String   @default("UTC")
+  logo      String?
+  address   String?
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users            User[]
+  memberProfiles   MemberProfile[]
+  membershipPlans  MembershipPlan[]
+  classTemplates   ClassTemplate[]
+  classSessions    ClassSession[]
+  waivers          Waiver[]
+  intakeForms      IntakeForm[]
+  staffProfiles    StaffProfile[]
+  broadcastCampaigns BroadcastCampaign[]
+
+  @@map("studios")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTH / USER (NextAuth compatible)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  phone         String?
+  password      String?   // hashed, for credentials provider
+  role          UserRole  @default(member)
+  studioId      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  studio          Studio?         @relation(fields: [studioId], references: [id])
+  accounts        Account[]
+  sessions        Session[]
+  memberProfile   MemberProfile?
+  staffProfile    StaffProfile?
+  bookings        Booking[]
+  payments        Payment[]
+  creditLedger    CreditLedger[]
+  memberMemberships MemberMembership[]
+  waiverSignatures  WaiverSignature[]
+  intakeResponses   IntakeResponse[]
+  notificationLogs  NotificationLog[]
+  checkIns          CheckIn[]
+  qrCodes           QRCode[]
+  notes             Note[]           @relation("NoteSubject")
+  authoredNotes     Note[]           @relation("NoteAuthor")
+  timeEntries       TimeEntry[]
+  payRates          PayRate[]
+  classTemplatesAsInstructor ClassTemplate[] @relation("ClassTemplateInstructor")
+  classSessionsAsInstructor  ClassSession[]  @relation("ClassSessionInstructor")
+
+  @@map("users")
+}
+
+// NextAuth required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MEMBER PROFILE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model MemberProfile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  studioId         String
+  emergencyContact Json?
+  healthNotes      String?
+  referralCode     String   @unique @default(cuid())
+  referredBy       String?
+  tags             String[]
+  marketingOptIn   Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studio  Studio @relation(fields: [studioId], references: [id])
+
+  @@map("member_profiles")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MEMBERSHIP PLANS & MEMBER MEMBERSHIPS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model MembershipPlan {
+  id                    String         @id @default(cuid())
+  studioId              String
+  name                  String
+  description           String?
+  type                  MembershipType
+  price                 Decimal        @db.Decimal(10, 2)
+  billingCycle          BillingCycle
+  creditCount           Int?
+  creditExpireDays      Int?
+  allowedClassTypes     String[]
+  bookingPriorityDays   Int            @default(0)
+  isActive              Boolean        @default(true)
+  isIntroOffer          Boolean        @default(false)
+  maxPurchasesPerMember Int?
+  stripePriceId         String?
+  stripeProductId       String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  studio          Studio           @relation(fields: [studioId], references: [id])
+  memberMemberships MemberMembership[]
+
+  @@map("membership_plans")
+}
+
+model MemberMembership {
+  id                   String           @id @default(cuid())
+  memberId             String
+  planId               String
+  status               MembershipStatus @default(active)
+  startDate            DateTime
+  endDate              DateTime?
+  nextBillingDate      DateTime?
+  creditsRemaining     Int              @default(0)
+  creditsTotal         Int              @default(0)
+  stripeSubscriptionId String?
+  stripeCustomerId     String?
+  pausedUntil          DateTime?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  member User           @relation(fields: [memberId], references: [id])
+  plan   MembershipPlan @relation(fields: [planId], references: [id])
+
+  @@map("member_memberships")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CLASS SCHEDULING
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ClassTemplate {
+  id                 String   @id @default(cuid())
+  studioId           String
+  name               String
+  description        String?
+  classType          String
+  instructorId       String?
+  roomId             String?
+  durationMinutes    Int
+  capacity           Int
+  onlineCapacity     Int
+  recurrenceRule     String?  // RRULE string
+  bookingWindowDays  Int      @default(7)
+  cancelWindowHours  Int      @default(2)
+  lateCancelFee      Decimal? @db.Decimal(10, 2)
+  noShowFee          Decimal? @db.Decimal(10, 2)
+  virtualLink        String?
+  isVirtual          Boolean  @default(false)
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  studio         Studio          @relation(fields: [studioId], references: [id])
+  instructor     User?           @relation("ClassTemplateInstructor", fields: [instructorId], references: [id])
+  classSessions  ClassSession[]
+  waitlistConfig WaitlistConfig?
+
+  @@map("class_templates")
+}
+
+model ClassSession {
+  id              String        @id @default(cuid())
+  templateId      String?
+  studioId        String
+  name            String
+  instructorId    String?
+  startAt         DateTime
+  endAt           DateTime
+  capacity        Int?          // override from template
+  onlineCapacity  Int?          // override from template
+  status          SessionStatus @default(scheduled)
+  spotsLayout     Json?         // JSON for Pick-a-Spot
+  virtualLink     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  template   ClassTemplate? @relation(fields: [templateId], references: [id])
+  studio     Studio         @relation(fields: [studioId], references: [id])
+  instructor User?          @relation("ClassSessionInstructor", fields: [instructorId], references: [id])
+  bookings   Booking[]
+  checkIns   CheckIn[]
+
+  @@map("class_sessions")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BOOKING
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Booking {
+  id            String        @id @default(cuid())
+  sessionId     String
+  memberId      String
+  status        BookingStatus @default(booked)
+  spotId        String?
+  bookedAt      DateTime      @default(now())
+  cancelledAt   DateTime?
+  checkedInAt   DateTime?
+  creditsUsed   Int           @default(0)
+  amountCharged Decimal       @default(0) @db.Decimal(10, 2)
+  bookingSource BookingSource @default(web)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  session  ClassSession @relation(fields: [sessionId], references: [id])
+  member   User         @relation(fields: [memberId], references: [id])
+  checkIns CheckIn[]
+  creditLedgerEntries CreditLedger[] @relation("BookingCredits")
+  waitlistNotifications WaitlistNotification[]
+
+  @@map("bookings")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WAITLIST CONFIG & NOTIFICATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+model WaitlistConfig {
+  id                        String       @id @default(cuid())
+  templateId                String       @unique
+  enabled                   Boolean      @default(true)
+  mode                      WaitlistMode @default(auto_add)
+  maxWaitlistSize           Int          @default(10)
+  cutoffMinutesBeforeClass  Int          @default(30)
+
+  template ClassTemplate @relation(fields: [templateId], references: [id])
+
+  @@map("waitlist_configs")
+}
+
+model WaitlistNotification {
+  id        String   @id @default(cuid())
+  bookingId String
+  sentAt    DateTime @default(now())
+  expiresAt DateTime?
+  claimed   Boolean  @default(false)
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@map("waitlist_notifications")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAYMENTS & CREDITS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Payment {
+  id                    String        @id @default(cuid())
+  memberId              String
+  amount                Decimal       @db.Decimal(10, 2)
+  currency              String        @default("usd")
+  type                  PaymentType
+  status                PaymentStatus @default(pending)
+  stripePaymentIntentId String?
+  stripeInvoiceId       String?
+  description           String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  member       User           @relation(fields: [memberId], references: [id])
+  creditLedger CreditLedger[] @relation("PaymentCredits")
+
+  @@map("payments")
+}
+
+model CreditLedger {
+  id        String       @id @default(cuid())
+  memberId  String
+  delta     Int          // positive = credit, negative = debit
+  reason    CreditReason
+  bookingId String?
+  paymentId String?
+  createdAt DateTime     @default(now())
+  expiresAt DateTime?
+
+  member  User     @relation(fields: [memberId], references: [id])
+  booking Booking? @relation("BookingCredits", fields: [bookingId], references: [id])
+  payment Payment? @relation("PaymentCredits", fields: [paymentId], references: [id])
+
+  @@map("credit_ledger")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WAIVERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Waiver {
+  id        String   @id @default(cuid())
+  studioId  String
+  title     String
+  content   String   @db.Text
+  version   String   @default("1.0")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  studio     Studio           @relation(fields: [studioId], references: [id])
+  signatures WaiverSignature[]
+
+  @@map("waivers")
+}
+
+model WaiverSignature {
+  id            String   @id @default(cuid())
+  waiverId      String
+  userId        String
+  signedAt      DateTime @default(now())
+  ipAddress     String?
+  signatureData String?  @db.Text
+
+  waiver Waiver @relation(fields: [waiverId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([waiverId, userId])
+  @@map("waiver_signatures")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INTAKE FORMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model IntakeForm {
+  id        String   @id @default(cuid())
+  studioId  String
+  title     String
+  fields    Json     // JSON schema for form fields
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  studio    Studio           @relation(fields: [studioId], references: [id])
+  responses IntakeResponse[]
+
+  @@map("intake_forms")
+}
+
+model IntakeResponse {
+  id          String   @id @default(cuid())
+  formId      String
+  userId      String
+  responses   Json
+  submittedAt DateTime @default(now())
+
+  form IntakeForm @relation(fields: [formId], references: [id])
+  user User       @relation(fields: [userId], references: [id])
+
+  @@map("intake_responses")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STAFF NOTES
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Note {
+  id        String   @id @default(cuid())
+  memberId  String
+  authorId  String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  member User @relation("NoteSubject", fields: [memberId], references: [id])
+  author User @relation("NoteAuthor", fields: [authorId], references: [id])
+
+  @@map("notes")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CHECK-IN & QR CODES
+// ─────────────────────────────────────────────────────────────────────────────
+
+model CheckIn {
+  id          String        @id @default(cuid())
+  bookingId   String
+  memberId    String
+  sessionId   String
+  method      CheckInMethod @default(manual)
+  checkedInAt DateTime      @default(now())
+  checkedInBy String?       // staffId, nullable for self-checkin
+
+  booking Booking      @relation(fields: [bookingId], references: [id])
+  member  User         @relation(fields: [memberId], references: [id])
+  session ClassSession @relation(fields: [sessionId], references: [id])
+
+  @@map("check_ins")
+}
+
+model QRCode {
+  id        String   @id @default(cuid())
+  memberId  String
+  token     String   @unique @default(cuid())
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+
+  member User @relation(fields: [memberId], references: [id])
+
+  @@map("qr_codes")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STAFF PROFILES & PAYROLL
+// ─────────────────────────────────────────────────────────────────────────────
+
+model StaffProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  studioId        String
+  bio             String?  @db.Text
+  specialties     String[]
+  photo           String?
+  instagramHandle String?
+  isPublic        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studio Studio @relation(fields: [studioId], references: [id])
+
+  @@map("staff_profiles")
+}
+
+model PayRate {
+  id            String      @id @default(cuid())
+  staffId       String
+  type          PayRateType
+  amount        Decimal     @db.Decimal(10, 2)
+  effectiveFrom DateTime    @default(now())
+  createdAt     DateTime    @default(now())
+
+  staff User @relation(fields: [staffId], references: [id])
+
+  @@map("pay_rates")
+}
+
+model TimeEntry {
+  id           String    @id @default(cuid())
+  staffId      String
+  clockedInAt  DateTime
+  clockedOutAt DateTime?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  staff User @relation(fields: [staffId], references: [id])
+
+  @@map("time_entries")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model NotificationLog {
+  id       String              @id @default(cuid())
+  userId   String
+  type     String
+  channel  NotificationChannel
+  status   NotificationStatus  @default(sent)
+  sentAt   DateTime            @default(now())
+  metadata Json?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("notification_logs")
+}
+
+model BroadcastCampaign {
+  id             String   @id @default(cuid())
+  studioId       String
+  subject        String
+  body           String   @db.Text
+  audience       Json     // JSON filter for audience segmentation
+  sentAt         DateTime?
+  recipientCount Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  studio Studio @relation(fields: [studioId], references: [id])
+
+  @@map("broadcast_campaigns")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REPORT EXPORTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ReportExport {
+  id          String   @id @default(cuid())
+  type        String
+  generatedBy String
+  generatedAt DateTime @default(now())
+  fileUrl     String?
+  params      Json?
+
+  @@map("report_exports")
 }

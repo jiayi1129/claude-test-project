@@ -1,100 +1,124 @@
-import Image from "next/image";
+import Link from "next/link";
+import { Dumbbell, Calendar, Users, CreditCard, BarChart3 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
-export default function Home() {
+const features = [
+  {
+    icon: Calendar,
+    title: "Class Scheduling",
+    description:
+      "Create and manage recurring classes with flexible scheduling and real-time booking.",
+  },
+  {
+    icon: Users,
+    title: "Member Management",
+    description:
+      "Centralized member database with profiles, waivers, and communication tools.",
+  },
+  {
+    icon: CreditCard,
+    title: "Memberships & Payments",
+    description:
+      "Flexible pricing with Stripe-powered subscriptions, packs, and drop-ins.",
+  },
+  {
+    icon: BarChart3,
+    title: "Reports & Analytics",
+    description:
+      "Business intelligence dashboard with revenue, attendance, and retention metrics.",
+  },
+];
+
+export default function HomePage() {
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="flex min-h-screen flex-col">
+      {/* Header */}
+      <header className="border-b bg-background">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-2">
+            <Dumbbell className="h-6 w-6 text-primary" />
+            <span className="text-xl font-bold">FitBook</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" asChild>
+              <Link href="/login">Sign In</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/register">Get Started</Link>
+            </Button>
+          </div>
         </div>
+      </header>
+
+      {/* Hero */}
+      <main className="flex-1">
+        <section className="bg-gradient-to-b from-background to-muted/30 py-24 text-center">
+          <div className="mx-auto max-w-4xl px-4">
+            <h1 className="text-5xl font-bold tracking-tight sm:text-6xl">
+              Manage your fitness studio{" "}
+              <span className="text-primary">effortlessly</span>
+            </h1>
+            <p className="mt-6 text-xl text-muted-foreground">
+              FitBook is the all-in-one booking and management platform designed
+              for pilates and yoga studios. Streamline classes, memberships, and
+              payments in one place.
+            </p>
+            <div className="mt-10 flex justify-center gap-4">
+              <Button size="lg" asChild>
+                <Link href="/register">Start Free Trial</Link>
+              </Button>
+              <Button size="lg" variant="outline" asChild>
+                <Link href="/schedule">Browse Classes</Link>
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        {/* Features */}
+        <section className="py-24">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl font-bold tracking-tight">
+                Everything your studio needs
+              </h2>
+              <p className="mt-4 text-lg text-muted-foreground">
+                From scheduling to payments, FitBook handles it all.
+              </p>
+            </div>
+
+            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+              {features.map((feature) => {
+                const Icon = feature.icon;
+                return (
+                  <Card key={feature.title}>
+                    <CardHeader>
+                      <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                        <Icon className="h-5 w-5 text-primary" />
+                      </div>
+                      <CardTitle className="text-lg">{feature.title}</CardTitle>
+                      <CardDescription>{feature.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent />
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        </section>
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+
+      {/* Footer */}
+      <footer className="border-t py-8">
+        <div className="mx-auto max-w-7xl px-4 text-center text-sm text-muted-foreground">
+          <p>© {new Date().getFullYear()} FitBook. All rights reserved.</p>
+        </div>
       </footer>
     </div>
   );
